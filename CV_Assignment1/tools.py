@@ -1273,81 +1273,59 @@ def PixelMagDir(Image, x, y):
     return (mag, theta)
 
 
-def SelectBin(direc):
+def SelectBin(direc, binNum):
+    offset = 360.0 / binNum    
     lower = 0.0
-    upper = 45.0
-    if (direc >= lower) and (direc < upper):
-        return 0
-    lower += 45.0
-    upper += 45.0
-    if (direc >= lower) and (direc < upper):
-        return 1
-    lower += 45.0
-    upper += 45.0
-    if (direc >= lower) and (direc < upper):
-        return 2
-    lower += 45.0
-    upper += 45.0
-    if (direc >= lower) and (direc < upper):
-        return 3
-    lower += 45.0
-    upper += 45.0
-    if (direc >= lower) and (direc < upper):
-        return 4
-    lower += 45.0
-    upper += 45.0
-    if (direc >= lower) and (direc < upper):
-        return 5
-    lower += 45.0
-    upper += 45.0
-    if (direc >= lower) and (direc < upper):
-        return 6
-    lower += 45.0
-    upper += 45.0
-    if (direc >= lower) and (direc < upper):
-        return 7
+    upper = lower + offset
+    for i in range(binNum):
+        if (direc >= lower) and (direc < upper):
+            return i
+        else:
+            lower += offset
+            upper += offset
+    return -1
 
-def CreateBins(neigborMagDir):
-    bin = np.zeros(8) # bins for 8 directions
-    for i in range(64):
+def CreateBins(neigborMagDir, binNum):
+    bins = np.zeros(binNum) # bins for "binNum" of directions
+    n = neigborMagDir.shape[0]
+    # or n = len(neigborMagDir)
+    for i in range(n):
         direc = neigborMagDir[i, 4]
-        binindex = SelectBin(direc)
-        bin[binindex] += neigborMagDir[i, 3]
-    return bin
+        binindex = SelectBin(direc, binNum)
+        if binindex == -1:
+            print "Bin Select Error!"
+            return -1
+        else:
+            bins[binindex] += neigborMagDir[i, 3]
+    return bins
 
 
-
-
-
-def BuildDescriptor(GP, Extrema):
-    Scale = Extrema[0]
-    Layer = Extrema[1] + 1 # +1 for shift?
-    Base = GP[Scale, Layer]
+def GetKeyDirection(Base, Extrema):
     (height, width) = Base.shape
     x = int(height * Extrema[2])
     y = int(width * Extrema[3])
     positive = range(1, 5)
     negative = range(-4, 0).reverse()
     neigborMagDir = np.zeros([64, 5]) # cord-x and cord-y, kernel weight, Mag and Dir
-    kernel = BuildGKernel(1.6, 9, 2) # the sigma of the kernel still need to be determined
+    kernel = BuildGKernel(2.0, 9, 2) # the sigma of the kernel still need to be determined
     count = 0
     for i in range(4):
         for j in range(4):
-            neigborMagDir[count, 0] = x + i
-            neigborMagDir[count, 1] = y + i
-            neigborMagDir[count, 2] = kernel[4 + i, 4 + i]
+            neigborMagDir[count, 0] = x + negative[i]
+            neigborMagDir[count, 1] = y + negative[j]
+            neigborMagDir[count, 2] = kernel[4 + negative[i], 4 + negative[j]]
             count += 1
-            neigborMagDir[count, 0] = x + i
-            neigborMagDir[count, 1] = y + j
-            neigborMagDir[count, 2] = kernel[4 + i, 4 + j]
+            neigborMagDir[count, 0] = x + negative[i]
+            neigborMagDir[count, 1] = y + positive[j]
+            neigborMagDir[count, 2] = kernel[4 + negative[i], 4 + positive[j]]
             count += 1
-            neigborMagDir[count, 0] = x + j
-            neigborMagDir[count, 1] = y + i
-            neigborMagDir[count, 2] = kernel[4 + j, 4 + i]
+            neigborMagDir[count, 0] = x + positive[i]
+            neigborMagDir[count, 1] = y + negative[j]
+            neigborMagDir[count, 2] = kernel[4 + positive[i], 4 + negative[i]]
             count += 1
-            neigborMagDir[count, 0] = x + j
-            neigborMagDir[count, 1] = y + j
-            neigborMagDir[count, 2] = kernel[4 + j, 4 + j]
+            neigborMagDir[count, 0] = x + positive[i]
+            neigborMagDir[count, 1] = y + positive[j]
+            neigborMagDir[count, 2] = kernel[4 + positive[i], 4 + positive[j]]
             count += 1
     for i in range(64):
         xx = neigborMagDir[i, 0]
@@ -1355,13 +1333,14 @@ def BuildDescriptor(GP, Extrema):
         (mag, theta) = PixelMagDir(Base, xx, yy)
         neigborMagDir[i, 3] = mag * neigborMagDir[i, 2]
         neigborMagDir[i, 4] = theta
-    #------------build bins and Gkernel weight BuildGKernel(sigma, kernelsize, Dimension)
-    bins = CreateBins(neigborMagDir)
+
+    binNum = 36
+    bins = CreateBins(neigborMagDir, binNum)
     binmax = -1.0 # bin max magnitude
     binauxmax = -1.0 # bin aux max magnitude
     binmaxi = -1 # bin max magnitude index
     binauxmaxi = -1 # bin aux max magnitude index
-    for i in range(8):
+    for i in range(binNum):
         if bins[i] > binmax:
             binmax = bins[i]
             binauxmaxi = binmaxi
@@ -1370,19 +1349,77 @@ def BuildDescriptor(GP, Extrema):
             binauxmaxi = i
     if binauxmax < binmax * 0.8:
         binauxmaxi = -1
+    # currently does not return the "binauxmaxi" as a secondary main direction
+    
+    return (binmaxi, binNum) 
 
-    # not over yet
+
+def RotateImagebyMDir(Image, Maindir) # the rotation routine during the creation of descriptor
+    dirIndex = Maindir[0]
+    binNum = Maindir[1]
+    offset = 360.0 / binNum
+    direction = offset * (float(dirIndex) + 0.5) 
+    # do the rotation here
+    RImage = 0
+    x = 0
+    y = 0
+    return (RImage, x, y)
+
+
+def BuildDescriptor(GP, Extrema, BinNum): #build a sift descriptor for a key point "Extrema"
+    Scale = Extrema[0]
+    Layer = Extrema[1] + 1 # +1 for shift?
+    Base = GP[Scale, Layer]
+    (height, width) = Base.shape
+    x = int(height * Extrema[2])
+    y = int(width * Extrema[3])
+    positive = range(1, 9)
+    negative = range(-8, 0).reverse()
+    neigborMagDir = np.zeros([256, 5]) # cord-x and cord-y, kernel weight, Mag and Dir
+    kernel = BuildGKernel(2.0, 17, 2) # the sigma of the kernel still need to be determined
+    count = 0
+    for i in range(8):
+        for j in range(8):
+            neigborMagDir[count, 0] = x + negative[i]
+            neigborMagDir[count, 1] = y + negative[j]
+            neigborMagDir[count, 2] = kernel[8 + negative[i], 8 + negative[j]]
+            count += 1
+            neigborMagDir[count, 0] = x + negative[i]
+            neigborMagDir[count, 1] = y + positive[j]
+            neigborMagDir[count, 2] = kernel[8 + negative[i], 8 + positive[j]]
+            count += 1
+            neigborMagDir[count, 0] = x + positive[i]
+            neigborMagDir[count, 1] = y + negative[j]
+            neigborMagDir[count, 2] = kernel[8 + positive[i], 8 + negative[i]]
+            count += 1
+            neigborMagDir[count, 0] = x + positive[i]
+            neigborMagDir[count, 1] = y + positive[j]
+            neigborMagDir[count, 2] = kernel[8 + positive[i], 8 + positive[j]]
+            count += 1
+    for i in range(256):
+        xx = neigborMagDir[i, 0]
+        yy = neigborMagDir[i, 1]
+        (mag, theta) = PixelMagDir(Base, xx, yy)
+        neigborMagDir[i, 3] = mag * neigborMagDir[i, 2]
+        neigborMagDir[i, 4] = theta
+    #------------build bins and Gkernel weight BuildGKernel(sigma, kernelsize, Dimension)
+    mainDirection = GetKeyDirection(Base, Extrema)
+        
+    #rotate the image here by its mainDirection
+    
+    
+    #bins = CreateBins(neigborMagDir, 8)
+    
     return 
 
 
                 
                  
-def GenerateDescriptors(ExStack, GP):
-    #generate 128 dimension vector descriptors for all extrema points
+def GenerateDescriptors(ExStack, GP): #main routine to generate 128 dimensional vector descriptors for all extrema points of the image
     (Snum, Gnum) = (GP.shape[0], GP.shape[1])
     ExNum = len(ExStack)
     for i in range(ExNum):
-        # BuildDescriptor
-        return
+        descriptors = BuildDescriptor(GP, ExStack[i], 8)
+    return descriptors
             
             
