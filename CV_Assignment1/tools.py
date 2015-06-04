@@ -919,7 +919,7 @@ def DiffofGaussian(GP, Snum, Gnum): # GP is the GaussianPyramid
 def ExtractDoGExtrema(DoG, Snum, DoGnum): # compare each pixel value of DoG with the 26 neigboring pixels
     ans = c.copy(DoG)
     v = np.zeros(27)
-    percent = -1.0
+    percent = -1.0 #debug use
     sums = Snum * (DoGnum - 1)
     for i in range(Snum):
         for j in range(1, DoGnum - 1):
@@ -970,7 +970,8 @@ def ExtractDoGExtrema(DoG, Snum, DoGnum): # compare each pixel value of DoG with
                         if v[k] < v[0]:
                             maxcheck += 1
 #                         check = np.argsort(v, axis = 0)
-                    if (equalcheck != 0) and ((maxcheck == 0 and mincheck > 0) or (maxcheck > 0 and mincheck == 0)):
+                    #if (equalcheck == 0) and ((maxcheck == 0 and mincheck > 0) or (maxcheck > 0 and mincheck == 0)):
+                    if maxcheck == 26 or mincheck == 26:
                         ans[i, j][x, y] = 1     
     ans1 = {(0,0):0}
     for i in range(Snum):
@@ -1238,7 +1239,7 @@ def RefineExtrima(Extremas, DoG, Snum, Gnum, rim = 10, ratio = 10, threshold = 0
 
  
    
-def ExtremaLocations(Extremas, Snum, Layernum):
+def ExtremaLocations(Extremas, Snum, Layernum): #gather up the locations in the full size image of extremas in all scales. Only for Display use. the discriptor should be generated on each scale to maintain its scale invarient features
     temp = np.zeros(4)
     ans = {0:0}
     count = 0
@@ -1253,15 +1254,17 @@ def ExtremaLocations(Extremas, Snum, Layernum):
                         y = float(n) / float(width)
                         temp[0] = i
                         temp[1] = j
-                        temp[2] = x
-                        temp[3] = y
+                        #temp[2] = x
+                        #temp[3] = y  # x, y is for the scaled location, m,n is for the actual location in its corresponding scale
+                        temp[2] = m
+                        temp[3] = n
                         ans[count] = c.copy(temp)
                         count += 1
     return ans
 
 
 
-def PixelMagDir(Image, x, y):
+def PixelMagDir(Image, x, y):# return the magnitude and direction of a pixel's gradient
     a = Image[x + 1, y]
     b = Image[x - 1, y]
     c = Image[x, y + 1]
@@ -1302,8 +1305,10 @@ def CreateBins(neigborMagDir, binNum):
 
 def GetKeyDirection(Base, Extrema):
     (height, width) = Base.shape
-    x = int(height * Extrema[2])
-    y = int(width * Extrema[3])
+#    x = int(height * Extrema[2])
+#    y = int(width * Extrema[3])
+    x = Extrema[2]
+    y = Extrema[3]
     positive = range(1, 5)
     negative = range(-4, 0).reverse()
     neigborMagDir = np.zeros([64, 5]) # cord-x and cord-y, kernel weight, Mag and Dir
@@ -1343,27 +1348,24 @@ def GetKeyDirection(Base, Extrema):
     for i in range(binNum):
         if bins[i] > binmax:
             binmax = bins[i]
-            binauxmaxi = binmaxi
+            #binauxmaxi = binmaxi
             binmaxi = i
-        elif bin[i] > binauxmax:
-            binauxmaxi = i
-    if binauxmax < binmax * 0.8:
-        binauxmaxi = -1
+#        elif bin[i] > binauxmax:
+#            binauxmaxi = i
+#    if binauxmax < binmax * 0.8:
+#        binauxmaxi = -1
     # currently does not return the "binauxmaxi" as a secondary main direction
     
     return (binmaxi, binNum) 
 
 
-def RotateImagebyMDir(Image, Maindir) # the rotation routine during the creation of descriptor
+def RotateImagebyMDir(Image, Maindir, Center) # the rotation routine during the creation of descriptor
     dirIndex = Maindir[0]
     binNum = Maindir[1]
     offset = 360.0 / binNum
     direction = offset * (float(dirIndex) + 0.5) 
-    # do the rotation here
-    RImage = 0
-    x = 0
-    y = 0
-    return (RImage, x, y)
+    RImage = skimage.transform.rotate(Image, direction, False, Center)
+    return RImage
 
 
 def BuildDescriptor(GP, Extrema, BinNum): #build a sift descriptor for a key point "Extrema"
@@ -1371,8 +1373,10 @@ def BuildDescriptor(GP, Extrema, BinNum): #build a sift descriptor for a key poi
     Layer = Extrema[1] + 1 # +1 for shift?
     Base = GP[Scale, Layer]
     (height, width) = Base.shape
-    x = int(height * Extrema[2])
-    y = int(width * Extrema[3])
+#    x = int(height * Extrema[2])
+#    y = int(width * Extrema[3])
+    x = Extrema[2]
+    y = Extrema[3]
     positive = range(1, 9)
     negative = range(-8, 0).reverse()
     neigborMagDir = np.zeros([256, 5]) # cord-x and cord-y, kernel weight, Mag and Dir
@@ -1407,12 +1411,17 @@ def BuildDescriptor(GP, Extrema, BinNum): #build a sift descriptor for a key poi
         
     #rotate the image here by its mainDirection
     
+    RotatedI = RotateImagebyMDir(base, mainDirection, (x, y))
+    
+    #GenerateExVector
     
     #bins = CreateBins(neigborMagDir, 8)
     
     return 
 
-
+def GenerateExVector(Image, ExPosition):
+    
+    return
                 
                  
 def GenerateDescriptors(ExStack, GP): #main routine to generate 128 dimensional vector descriptors for all extrema points of the image

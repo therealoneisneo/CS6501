@@ -44,24 +44,24 @@ GaussianPyramid = {(0,0):0} #initialize a dictionary
 
 GaussianPyramid = t.ReadInPyramid(inputname, "G", Snum, Gnum)
  
-# DoGPyramid = t.DiffofGaussian(GaussianPyramid, Snum, Gnum)
-#  
-# t.SavePyramid(inputname, DoGPyramid, "DoG", Snum, Gnum - 1)
-#  
-#  
-# #----------------------------------------------------------Extrema 
-# 
-# Extrema = t.ExtractDoGExtrema(DoGPyramid, Snum, DoGnum)
-#  
-# t.SavePyramid(inputname, Extrema, "ExRaw", Snum, DoGnum - 2)
-# 
-# t.RefineExtrima(Extrema, DoGPyramid, Snum, Gnum, 12, 9, 0.022)
-# 
-# t.SavePyramid(inputname, Extrema, "ExFine", Snum, DoGnum - 2)
+DoGPyramid = t.DiffofGaussian(GaussianPyramid, Snum, Gnum)
+  
+t.SavePyramid(inputname, DoGPyramid, "DoG", Snum, Gnum - 1)
+  
+  
+ #----------------------------------------------------------Extrema 
+ 
+Extrema = t.ExtractDoGExtrema(DoGPyramid, Snum, DoGnum)
+  
+t.SavePyramid(inputname, Extrema, "ExRaw", Snum, DoGnum - 2)
+ 
+t.RefineExtrima(Extrema, DoGPyramid, Snum, Gnum, 12, 9, 0.022)
+ 
+t.SavePyramid(inputname, Extrema, "ExFine", Snum, DoGnum - 2)
 
-FineExtrema = t.ReadInPyramid(inputname, "Exfine", Snum, Gnum - 3)
+FineExtrema = t.ReadInPyramid(inputname, "ExFine", Snum, Gnum - 3)
 
-ExStack = t.ExtremaLocations(FineExtrema, Snum, Gnum - 3)
+ExStack = t.ExtremaLocations(FineExtrema, Snum, Gnum - 3) # a stack of extrema info: scale, layer, x, y.
 
 a = 0
 
