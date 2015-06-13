@@ -13,7 +13,7 @@ inputname = t.filepath("siftdata/building.jpg")
 
 
 #only take grayscale image
-Snum = 4 # number of different scales:4
+Snum = 1 # number of different scales:4
 Gnum = 6 # number of Gaussian layers in each scale:6
 DoGnum = Gnum - 1
    
@@ -23,13 +23,22 @@ GaussianPyramid = {(0,0):0} #initialize a dictionary
 
 
 
-# I = skimage.img_as_float(skimage.io.imread(inputname))
-# IG = t.TurnGray(I)
-# 
-# temp = t.GenerateGaussianLayers(t.ScaleImage2(IG, 2), Gnum)
-# for j in range(Gnum):
-#     GaussianPyramid[(0,j)] = temp[j]
-#  
+I = skimage.img_as_float(skimage.io.imread(inputname))
+IG = skimage.img_as_float(skimage.io.imread(inputname)) # when I is a gray scale image, the reading file is a 2d array
+#IG = t.GrayToArray(I)
+
+
+    
+temp = t.GenerateGaussianLayers(t.ScaleImage2(IG, 2), Gnum)
+for j in range(Gnum):
+    GaussianPyramid[(0,j)] = temp[j]
+  
+
+    
+    
+    
+    
+    
 # for i in range(1, Snum):
 #     temp = t.GenerateGaussianLayers(t.ScaleImage2(GaussianPyramid[(i - 1, Gnum - 3)], 1), Gnum)
 #     for j in range(Gnum):
@@ -41,29 +50,40 @@ GaussianPyramid = {(0,0):0} #initialize a dictionary
 
 
 #----------------------------------------------------------DoG
+#
+#GaussianPyramid = t.ReadInPyramid(inputname, "G", Snum, Gnum)
+# 
+#DoGPyramid = t.DiffofGaussian(GaussianPyramid, Snum, Gnum)
+#
+#DoGDis = t.DoGPyramidDisplay(DoGPyramid, Snum, Gnum)
+#  
+#t.SavePyramid(inputname, DoGDis, "DoG", Snum, Gnum - 1)
+#  
+#  
+# #----------------------------------------------------------Extrema 
+# 
+#Extrema = t.ExtractDoGExtrema(DoGPyramid, Snum, DoGnum)
+#  
+#t.SavePyramid(inputname, Extrema, "ExRaw", Snum, DoGnum - 2)
+# 
+#t.RefineExtrima(Extrema, DoGPyramid, Snum, Gnum, 12, 9, 0.022)
+# 
+#t.SavePyramid(inputname, Extrema, "ExFine", Snum, DoGnum - 2)
 
-GaussianPyramid = t.ReadInPyramid(inputname, "G", Snum, Gnum)
- 
-DoGPyramid = t.DiffofGaussian(GaussianPyramid, Snum, Gnum)
-  
-t.SavePyramid(inputname, DoGPyramid, "DoG", Snum, Gnum - 1)
-  
-  
- #----------------------------------------------------------Extrema 
- 
-Extrema = t.ExtractDoGExtrema(DoGPyramid, Snum, DoGnum)
-  
-t.SavePyramid(inputname, Extrema, "ExRaw", Snum, DoGnum - 2)
- 
-t.RefineExtrima(Extrema, DoGPyramid, Snum, Gnum, 12, 9, 0.022)
- 
-t.SavePyramid(inputname, Extrema, "ExFine", Snum, DoGnum - 2)
-
-FineExtrema = t.ReadInPyramid(inputname, "ExFine", Snum, Gnum - 3)
-
-ExStack = t.ExtremaLocations(FineExtrema, Snum, Gnum - 3) # a stack of extrema info: scale, layer, x, y.
-
-a = 0
+#print 1
+#
+#FineExtrema = t.ReadInPyramid(inputname, "ExFine", Snum, Gnum - 3)
+#
+#print 2
+#
+#ExStack = t.ExtremaLocations(FineExtrema, Snum, Gnum - 3) # a stack of extrema info: scale, layer, x, y.
+##t.SaveExStack(ExStack)
+#
+#print 3
+#
+#result = t.GenerateDescriptors(ExStack, GaussianPyramid)
+#
+#print 4
 
   
 

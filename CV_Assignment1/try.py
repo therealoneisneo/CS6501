@@ -22,6 +22,10 @@ GaussianPyramid = {(0,0):0} #initialize a dictionary
 
 
 I = skimage.img_as_float(skimage.io.imread(inputname))
+
+
+print a
+
 # IG = t.TurnGray(I)
 # 
 # temp = t.GenerateGaussianLayers(t.ScaleImage2(IG, 2), Gnum)
@@ -43,15 +47,25 @@ I = skimage.img_as_float(skimage.io.imread(inputname))
 # GaussianPyramid = t.ReadInPyramid(inputname, "G", Snum, Gnum)
 # 
 # testdic = {(0,0):0}
-# for i in range(Snum):
+# f1or i in range(Snum):
 #     for j in range(1, Gnum):
 #         testdic[i, j - 1] = GaussianPyramid[i, j]
 
-rotate = skimage.transform.rotate(I, 65, False, (100, 0))
+#rotate = skimage.transform.rotate(I, 65, False, (100, 0))
 
-skimage.io.imshow(I)
+a = [1,2,3]
+print a
 
-skimage.io.imshow(rotate)
+
+
+f = open("testfile,txt", 'w')
+f.write(str(a))
+f.close()
+
+
+#skimage.io.imshow(cut)
+
+#skimage.io.imshow(rotate)
 #   
 # DoGPyramid = t.DiffofGaussian(GaussianPyramid, Snum, Gnum)
 #   

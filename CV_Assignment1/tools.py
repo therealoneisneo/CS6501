@@ -2,6 +2,7 @@ import numpy as np
 import copy as c
 import sys
 import skimage.io
+import skimage.transform
 
 #First version of Gsmooth
 # def Gsmooth(I, sigma = 0.8, kernelsize = 3.0):        # Gaussian Smooth
@@ -127,7 +128,7 @@ def Gsmooth(I, sigma = 0.8, kernelsize = 3.0, channels = 3):        # Gaussian S
     if kernelsize >= np.minimum(height, width):
         return I
     center = int(kernelsize/2)
-    kernel = BuildGKernel(sigma, kernelsize, 1)    
+    kernel = BuildGKernel(sigma, kernelsize, 1)
 #     kernel = np.zeros(kernelsize)       # create a 1D kernel for the Gsmooth
 #     center = int(kernelsize/2)
 #     PI = 3.1415926
@@ -391,7 +392,18 @@ def CornerPlot(Corners, Image):# draw indicator of corners in Image
     return ans
 
 
-
+def GrayToArray(I): # get a singel channel of a gray image to an array
+    (height, width, channels) = I.shape
+    ans = np.empty([height, width])
+    percent = 0.0
+    for i in range(height):
+        temp = (i * 100 / (height - 1))
+        if temp != percent:
+            percent = temp
+            print "Turn to Grayscale..." , percent, "% complete"
+        for j in range(width):
+            ans[i, j] = I[i, j, 0]
+    return ans
 
 def TurnGray(I): # turn the image to gray scale
     (height, width, channels) = I.shape
@@ -724,9 +736,7 @@ def ScaleMapping(I, scalemin = 0, scalemax = 1.0): # mapping a grayscale image t
     Srange = scalemax - scalemin
     for i in range(height):
         for j in range(width):
-            ans[i,j,0] = (I[i,j,0] - minv) * Srange / D + scalemin
-            ans[i,j,1] = ans[i,j,0]
-            ans[i,j,2] = ans[i,j,0] 
+            ans[i, j] = (I[i, j] - minv) * Srange / D + scalemin
     return ans
     
     
@@ -784,22 +794,22 @@ def TrackEdeg(I, O, ii, jj, L_threshold):# sub-routine for the edge tracking
     
     
     
-def GenerateGaussianLayers(I, Lnum):# I is the input image, Lnum is the number of Layers
+def GenerateGaussianLayers(I, Gnum):# I is the input image, Lnum is the number of Layers
     print "Generating Gaussian Layers..."
     (height, width) = I.shape
-    ans = np.zeros([Lnum, height, width])
-    sigma = np.zeros(Lnum)#the sigma values for different guassian
-    s = Lnum - 2
+    ans = np.zeros([Gnum, height, width])
+    sigma = np.zeros(Gnum)#the sigma values for different guassian
+    s = Gnum - 2
 #     k = np.sqrt(2)
     k = np.power(2, (1.0/s)) 
     sigmazero = 1.6
-    for i in range(Lnum - 1):
+    for i in range(Gnum - 1):
         sigma[i] = sigmazero * np.power(k,i)
     ans[0] = I
-    for i in range(1, Lnum):
-        ans[i] = Gsmooth(I, sigma[i - 1], 7, 1)
-#         ans[i] = ans[i][4:-4, 4:-4]
-#     ans[0] = ans[0][4:-4, 4:-4]
+    for i in range(Gnum - 1):
+        ans[i + 1] = Gsmooth(I, sigma[i], 7, 1)
+        ans[i + 1] = ans[i + 1][4:-4, 4:-4]
+     ans[0] = ans[0][4:-4, 4:-4]
     return ans
         
     
@@ -848,11 +858,9 @@ def ScaleImage1(I, scale = 1):#sample an image to a new scale by factor 2
                 ans[i, j, 2] = ans[i, j, 0]
     return ans
 
-def ScaleImage2(I, scale = 1):#simply up-sample or down sample to a new scale by factor 2
-                                        # the 'scale' only take 1 as down-scale and 2 as up scale
-                                        #only take in 1 channel image(matrix)
+def ScaleImage2(I, scale = 1):#simply up-sample or down sample to a new scale by factor 2. the 'scale' only take 1 as down-scale and 2 as up scale. only take in 1 channel image(matrix)
     (height, width) = I.shape
-    if scale == 1:
+    if scale == 1: # down-scale
         height = int(np.floor(height/2))
         width = int(np.floor(width/2))
         ans = np.zeros([height, width])
@@ -913,9 +921,13 @@ def DiffofGaussian(GP, Snum, Gnum): # GP is the GaussianPyramid
             DoG[(i,j)] = Diff(GP[(i, j)], GP[(i, j + 1)])
     return DoG
 
-
-
-    
+def DoGPyramidDisplay(DoG, Snum, Gnum): #shift the value in a DoG Pyramid for display
+    DoGDis = c.copy(DoG)
+    for i in range(Snum):
+        (height, width) = DoG[i, 0].shape
+        for j in range(Gnum - 1):
+            ScaleMapping(DoGDis[i, j], 0.0, 255.0)
+    return DoGDis
 def ExtractDoGExtrema(DoG, Snum, DoGnum): # compare each pixel value of DoG with the 26 neigboring pixels
     ans = c.copy(DoG)
     v = np.zeros(27)
@@ -1238,11 +1250,22 @@ def RefineExtrima(Extremas, DoG, Snum, Gnum, rim = 10, ratio = 10, threshold = 0
 
 
  
+ 
+def SaveExStack(ExStack):
+    f = open("ExStack.txt", 'w')
+    n = len(ExStack)
+    for i in range(n):
+        f.write(ExStack[i])
+        f.write("\n")
+    f.close()
+    return
    
 def ExtremaLocations(Extremas, Snum, Layernum): #gather up the locations in the full size image of extremas in all scales. Only for Display use. the discriptor should be generated on each scale to maintain its scale invarient features
     temp = np.zeros(4)
     ans = {0:0}
     count = 0
+#    for i in range(1):
+#        for j in range(1):#debug
     for i in range(Snum):
         for j in range(Layernum):
             (height, width) = Extremas[i, j].shape
@@ -1250,8 +1273,8 @@ def ExtremaLocations(Extremas, Snum, Layernum): #gather up the locations in the 
                 for n in range(width):
                     if Extremas[i, j][m, n] == 1:
                         print count
-                        x = float(m) / float(height)
-                        y = float(n) / float(width)
+#                        x = float(m) / float(height)
+#                        y = float(n) / float(width)
                         temp[0] = i
                         temp[1] = j
                         #temp[2] = x
@@ -1280,6 +1303,8 @@ def SelectBin(direc, binNum):
     offset = 360.0 / binNum    
     lower = 0.0
     upper = lower + offset
+    if direc < 0:
+        direc = 360 + direc
     for i in range(binNum):
         if (direc >= lower) and (direc < upper):
             return i
@@ -1299,7 +1324,7 @@ def CreateBins(neigborMagDir, binNum):
             print "Bin Select Error!"
             return -1
         else:
-            bins[binindex] += neigborMagDir[i, 3]
+            bins[binindex] += float(neigborMagDir[i, 3])
     return bins
 
 
@@ -1309,29 +1334,31 @@ def GetKeyDirection(Base, Extrema):
 #    y = int(width * Extrema[3])
     x = Extrema[2]
     y = Extrema[3]
-    positive = range(1, 5)
-    negative = range(-4, 0).reverse()
+    offset = range(-4, 5)
+    offset.remove(0)
+#    positive = range(1, 5)
+#    negative = range(-4, 0).reverse()
     neigborMagDir = np.zeros([64, 5]) # cord-x and cord-y, kernel weight, Mag and Dir
-    kernel = BuildGKernel(2.0, 9, 2) # the sigma of the kernel still need to be determined
+    kernel = BuildGKernel(1, 9, 2) # the sigma of the kernel still need to be determined
     count = 0
-    for i in range(4):
-        for j in range(4):
-            neigborMagDir[count, 0] = x + negative[i]
-            neigborMagDir[count, 1] = y + negative[j]
-            neigborMagDir[count, 2] = kernel[4 + negative[i], 4 + negative[j]]
+    for i in range(8):
+        for j in range(8):
+            neigborMagDir[count, 0] = x + offset[i]
+            neigborMagDir[count, 1] = y + offset[j]
+            neigborMagDir[count, 2] = kernel[4 + offset[i], 4 + offset[j]]
             count += 1
-            neigborMagDir[count, 0] = x + negative[i]
-            neigborMagDir[count, 1] = y + positive[j]
-            neigborMagDir[count, 2] = kernel[4 + negative[i], 4 + positive[j]]
-            count += 1
-            neigborMagDir[count, 0] = x + positive[i]
-            neigborMagDir[count, 1] = y + negative[j]
-            neigborMagDir[count, 2] = kernel[4 + positive[i], 4 + negative[i]]
-            count += 1
-            neigborMagDir[count, 0] = x + positive[i]
-            neigborMagDir[count, 1] = y + positive[j]
-            neigborMagDir[count, 2] = kernel[4 + positive[i], 4 + positive[j]]
-            count += 1
+#            neigborMagDir[count, 0] = x + negative[i]
+#            neigborMagDir[count, 1] = y + positive[j]
+#            neigborMagDir[count, 2] = kernel[4 + negative[i], 4 + positive[j]]
+#            count += 1
+#            neigborMagDir[count, 0] = x + positive[i]
+#            neigborMagDir[count, 1] = y + negative[j]
+#            neigborMagDir[count, 2] = kernel[4 + positive[i], 4 + negative[i]]
+#            count += 1
+#            neigborMagDir[count, 0] = x + positive[i]
+#            neigborMagDir[count, 1] = y + positive[j]
+#            neigborMagDir[count, 2] = kernel[4 + positive[i], 4 + positive[j]]
+#            count += 1
     for i in range(64):
         xx = neigborMagDir[i, 0]
         yy = neigborMagDir[i, 1]
@@ -1359,7 +1386,7 @@ def GetKeyDirection(Base, Extrema):
     return (binmaxi, binNum) 
 
 
-def RotateImagebyMDir(Image, Maindir, Center) # the rotation routine during the creation of descriptor
+def RotateImagebyMDir(Image, Maindir, Center): # the rotation routine during the creation of descriptor
     dirIndex = Maindir[0]
     binNum = Maindir[1]
     offset = 360.0 / binNum
@@ -1377,58 +1404,62 @@ def BuildDescriptor(GP, Extrema, BinNum): #build a sift descriptor for a key poi
 #    y = int(width * Extrema[3])
     x = Extrema[2]
     y = Extrema[3]
-    positive = range(1, 9)
-    negative = range(-8, 0).reverse()
+    
+    mainDirection = GetKeyDirection(Base, Extrema)
+    
+    RotatedI = RotateImagebyMDir(Base, mainDirection, (x, y))
+    
+    #rotate the image by its mainDirection
+    ind = range(-8, 9)
+    ind.remove(0)
     neigborMagDir = np.zeros([256, 5]) # cord-x and cord-y, kernel weight, Mag and Dir
     kernel = BuildGKernel(2.0, 17, 2) # the sigma of the kernel still need to be determined
     count = 0
-    for i in range(8):
-        for j in range(8):
-            neigborMagDir[count, 0] = x + negative[i]
-            neigborMagDir[count, 1] = y + negative[j]
-            neigborMagDir[count, 2] = kernel[8 + negative[i], 8 + negative[j]]
-            count += 1
-            neigborMagDir[count, 0] = x + negative[i]
-            neigborMagDir[count, 1] = y + positive[j]
-            neigborMagDir[count, 2] = kernel[8 + negative[i], 8 + positive[j]]
-            count += 1
-            neigborMagDir[count, 0] = x + positive[i]
-            neigborMagDir[count, 1] = y + negative[j]
-            neigborMagDir[count, 2] = kernel[8 + positive[i], 8 + negative[i]]
-            count += 1
-            neigborMagDir[count, 0] = x + positive[i]
-            neigborMagDir[count, 1] = y + positive[j]
-            neigborMagDir[count, 2] = kernel[8 + positive[i], 8 + positive[j]]
+    for i in range(16):
+        for j in range(16):
+            neigborMagDir[count, 0] = x + ind[i]
+            neigborMagDir[count, 1] = y + ind[j]
+            neigborMagDir[count, 2] = kernel[8 + ind[i], 8 + ind[j]]
             count += 1
     for i in range(256):
         xx = neigborMagDir[i, 0]
         yy = neigborMagDir[i, 1]
-        (mag, theta) = PixelMagDir(Base, xx, yy)
+        (mag, theta) = PixelMagDir(RotatedI, xx, yy)
         neigborMagDir[i, 3] = mag * neigborMagDir[i, 2]
         neigborMagDir[i, 4] = theta
     #------------build bins and Gkernel weight BuildGKernel(sigma, kernelsize, Dimension)
-    mainDirection = GetKeyDirection(Base, Extrema)
-        
-    #rotate the image here by its mainDirection
     
-    RotatedI = RotateImagebyMDir(base, mainDirection, (x, y))
     
-    #GenerateExVector
-    
-    #bins = CreateBins(neigborMagDir, 8)
-    
-    return 
+    ExVec = GenerateExVector(neigborMagDir)
 
-def GenerateExVector(Image, ExPosition):
-    
-    return
+    return ExVec 
+
+def GenerateExVector(neigborMagDir):
+    vec = np.zeros(128)
+    for i in range(4):
+        for j in range(4):
+            ii = i * 4
+            jj = j * 4
+            for m in range(4):
+                for n in range(4):
+                    absx = ii + m
+                    absy = jj + n
+                    neigbor_pos = absx * 16 + absy
+                    vec_seg_pos = (i * 4 + j) * 8
+                    bin_index = SelectBin(neigborMagDir[neigbor_pos, 4], 8)
+                    vec_pos = vec_seg_pos + bin_index
+                    vec[vec_pos] += neigborMagDir[neigbor_pos, 3]
+    return vec
                 
                  
 def GenerateDescriptors(ExStack, GP): #main routine to generate 128 dimensional vector descriptors for all extrema points of the image
-    (Snum, Gnum) = (GP.shape[0], GP.shape[1])
+#    (Snum, Gnum) = (GP.shape[0], GP.shape[1])
     ExNum = len(ExStack)
+    descriptors = {0:0}
     for i in range(ExNum):
-        descriptors = BuildDescriptor(GP, ExStack[i], 8)
+        print "Computing the" + str(i) + "of" + str(ExNum) + "feature points..."
+        descriptors[i] = BuildDescriptor(GP, ExStack[i], 8)
+    #build a collection of descriptors here
     return descriptors
             
             
