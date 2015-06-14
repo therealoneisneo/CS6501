@@ -19,12 +19,13 @@ GaussianPyramid = {(0,0):0} #initialize a dictionary
 
 #----------------------------------------------------------Gaussian pyramid
 
+a = np.zeros([3,3])
+
+b = a + 0.5
+
+print b
 
 
-I = skimage.img_as_float(skimage.io.imread(inputname))
-
-
-print a
 
 # IG = t.TurnGray(I)
 # 
@@ -53,14 +54,13 @@ print a
 
 #rotate = skimage.transform.rotate(I, 65, False, (100, 0))
 
-a = [1,2,3]
-print a
 
 
 
-f = open("testfile,txt", 'w')
-f.write(str(a))
-f.close()
+#
+#f = open("testfile.txt", 'w')
+#f.write(str(a))
+#f.close()
 
 
 #skimage.io.imshow(cut)

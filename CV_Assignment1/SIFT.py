@@ -13,7 +13,7 @@ inputname = t.filepath("siftdata/building.jpg")
 
 
 #only take grayscale image
-Snum = 1 # number of different scales:4
+Snum = 4 # number of different scales:4
 Gnum = 6 # number of Gaussian layers in each scale:6
 DoGnum = Gnum - 1
    
@@ -27,48 +27,46 @@ I = skimage.img_as_float(skimage.io.imread(inputname))
 IG = skimage.img_as_float(skimage.io.imread(inputname)) # when I is a gray scale image, the reading file is a 2d array
 #IG = t.GrayToArray(I)
 
-
-    
-temp = t.GenerateGaussianLayers(t.ScaleImage2(IG, 2), Gnum)
-for j in range(Gnum):
-    GaussianPyramid[(0,j)] = temp[j]
-  
-
-    
-    
-    
-    
-    
-# for i in range(1, Snum):
-#     temp = t.GenerateGaussianLayers(t.ScaleImage2(GaussianPyramid[(i - 1, Gnum - 3)], 1), Gnum)
-#     for j in range(Gnum):
-#         GaussianPyramid[(i,j)] = temp[j]
+#
+#    
+#temp = t.GenerateGaussianLayers(t.ScaleImage2(IG, 2), Gnum)
+#
+#for j in range(Gnum):
+#    GaussianPyramid[(0,j)] = temp[j]
 # 
+#for i in range(1, Snum):
+#    temp = t.GenerateGaussianLayers(t.ScaleImage2(GaussianPyramid[(i - 1, Gnum - 3)], 1), Gnum)
+#    for j in range(Gnum):
+#        GaussianPyramid[(i,j)] = temp[j]
 # 
-# t.SavePyramid(inputname, GaussianPyramid, "G", Snum, Gnum)
-
+#t.SavePyramid(inputname, GaussianPyramid, "G", Snum, Gnum)
+#
 
 
 #----------------------------------------------------------DoG
-#
-#GaussianPyramid = t.ReadInPyramid(inputname, "G", Snum, Gnum)
-# 
-#DoGPyramid = t.DiffofGaussian(GaussianPyramid, Snum, Gnum)
-#
+
+GaussianPyramid = t.ReadInPyramid(inputname, "G", Snum, Gnum)
+ 
+DoGPyramid = t.DiffofGaussian(GaussianPyramid, Snum, Gnum)
+
 #DoGDis = t.DoGPyramidDisplay(DoGPyramid, Snum, Gnum)
-#  
+#
 #t.SavePyramid(inputname, DoGDis, "DoG", Snum, Gnum - 1)
-#  
-#  
+  
+  
 # #----------------------------------------------------------Extrema 
-# 
-#Extrema = t.ExtractDoGExtrema(DoGPyramid, Snum, DoGnum)
-#  
-#t.SavePyramid(inputname, Extrema, "ExRaw", Snum, DoGnum - 2)
-# 
-#t.RefineExtrima(Extrema, DoGPyramid, Snum, Gnum, 12, 9, 0.022)
-# 
-#t.SavePyramid(inputname, Extrema, "ExFine", Snum, DoGnum - 2)
+ 
+Extrema = t.ExtractDoGExtrema(DoGPyramid, Snum, DoGnum)
+  
+t.SavePyramid(inputname, Extrema, "ExRaw", Snum, DoGnum - 2)
+ 
+t.RefineExtrima(Extrema, DoGPyramid, Snum, Gnum, 12, 9, 0.02)
+ 
+t.SavePyramid(inputname, Extrema, "ExFine", Snum, DoGnum - 2)
+
+
+# #----------------------------------------------------------read in data
+
 
 #print 1
 #

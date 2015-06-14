@@ -109,6 +109,8 @@ def BuildGKernel(sigma, kernelsize, Dimension): # build Gaussian kernel, Dimensi
                 dist = ((center - i)**2 + (center - j)**2)   # the distance to the center of the kernel
                 kernel[i, j] = np.exp( - dist / (2 * sigma * sigma)) / (2 * PI * sigma * sigma)
                 kernel[kernelsize - 1 - i, kernelsize - 1 - j] = kernel[i, j]
+                kernel[i, kernelsize - 1 - j] = kernel[i, j]
+                kernel[kernelsize - 1 - i, j] = kernel[i, j]
     else:
         print "error: Dimension parameter for Gaussian kernel must be 1 or 2!"
     return kernel
@@ -135,13 +137,14 @@ def Gsmooth(I, sigma = 0.8, kernelsize = 3.0, channels = 3):        # Gaussian S
 #     for i in range(center + 1): #build the kernel
 #         dist = abs(center - i)# the distance to the center of the kernel
 #         kernel[i] = kernel[kernelsize - 1 - i] = np.exp( - dist / (2 * sigma * sigma)) / (np.sqrt(2 * PI) * sigma)
-    ans = np.zeros(I.shape)
-    ans1 = np.zeros(I.shape)
-    
+#    ans = np.zeros(I.shape)
+#    ans1 = np.zeros(I.shape)
+    ans = c.copy(I)
+
     sums = width + height
     
     weight = 0.0
-    for i in range(len(kernel)):
+    for i in range(kernelsize):
         weight += kernel[i]
     
     if channels > 1:
@@ -151,41 +154,45 @@ def Gsmooth(I, sigma = 0.8, kernelsize = 3.0, channels = 3):        # Gaussian S
             if ((x * 100) / sums) != percent:
                 percent = ((x * 100) / sums)
                 print " Smoothing...", percent, "% complete"
-            for y in range(width):
-                for c in range(channels):
-                    if c == 4:
-                        ans[x,y,c] = 1
+            for y in range(center, width - center + 1):
+                for z in range(channels):
+                    if z == 3:
+                        ans[x, y, z] = 1
                     else:
-                        if y < center:
-                            for i in range(-y, center + 1):
-                                ans[x,y,c] += kernel[center + i] * I[x, y + i, c]
-                        elif y > (width - 1 - center):
-                            for i in range(-center, width - y):
-                                ans[x,y,c] += kernel[center + i] * I[x, y + i, c]
-                        else:
-                            for i in range(-center, center + 1):
-                                ans[x,y,c] += kernel[center + i] * I[x, y + i, c]
-                            ans[x,y,c] /= weight
+                        ans[x, y ,z] = 0
+                        for i in range(kernelsize):
+                            ans[x, y, z] += kernel[i] * I[x, y - center + i, z]
+                        ans[x, y, z] /= weight
+                            
+#                        for i in range(center, width - center + 1):
+#                            
+#                        if y < center:
+#                            for i in range(-y, center + 1):
+#                                ans[x,y,z] += kernel[center + i] * I[x, y + i, z]
+#                        elif y > (width - 1 - center):
+#                            for i in range(-center, width - y):
+#                                ans[x,y,z] += kernel[center + i] * I[x, y + i, z]
+#                        else:
+#                            for i in range(-center, center + 1):
+#                                ans[x,y,z] += kernel[center + i] * I[x, y + i, z]
+#                            
+                            
+
         # second round, smooth in y direction
+        ans1 = c.copy(ans)
         for y in range(width):
             if (((y + height) * 100) / sums) != percent:
                 percent = (((y + height) * 100) / sums)
                 print " Smoothing...", percent, "% complete"
-            for x in range(height):
-                for c in range(channels):
-                    if c == 4:
-                        ans1[x,y,c] = 1
+            for x in range(center, height - center + 1):
+                for z in range(channels):
+                    if z == 3:
+                        ans1[x, y, z] = 1
                     else:
-                        if x < center:
-                            for i in range(-x, center + 1):
-                                ans1[x,y,c] += kernel[center + i] * ans[x + i, y, c]
-                        elif x > (height - 1 - center):
-                            for i in range(-center, height - x):
-                                ans1[x,y,c] += kernel[center + i] * ans[x + i, y, c]
-                        else:
-                            for i in range(-center, center + 1):
-                                ans1[x,y,c] += kernel[center + i] * ans[x + i, y, c]
-                            ans1[x,y,c] /= weight
+                        ans1[x, y ,z] = 0
+                        for i in range(kernelsize):
+                            ans1[x, y, z] += kernel[i] * ans[x- center + i, y, z]
+                        ans1[x, y, z] /= weight   
     
     else:
         # first round, smooth in x direction
@@ -194,33 +201,22 @@ def Gsmooth(I, sigma = 0.8, kernelsize = 3.0, channels = 3):        # Gaussian S
             if ((x * 100) / sums) != percent:
                 percent = ((x * 100) / sums)
                 print " Smoothing...", percent, "% complete"
-            for y in range(width):
-                if y < center:
-                    for i in range(-y, center + 1):
-                        ans[x, y] += kernel[center + i] * I[x, y + i]
-                elif y > (width - 1 - center):
-                    for i in range(-center, width - y):
-                        ans[x, y] += kernel[center + i] * I[x, y + i]
-                else:
-                    for i in range(-center, center + 1):
-                        ans[x, y] += kernel[center + i] * I[x, y + i]
-                    ans[x, y] /= weight
+            for y in range(center, width - center):
+                ans[x, y] = 0
+                for i in range(kernelsize):
+                    ans[x, y] += kernel[i] * I[x, y - center + i]
+                ans[x, y] /= weight
         # second round, smooth in y direction
+        ans1 = c.copy(ans)
         for y in range(width):
             if (((y + height) * 100) / sums) != percent:
                 percent = (((y + height) * 100) / sums)
                 print " Smoothing...", percent, "% complete"
-            for x in range(height):
-                if x < center:
-                    for i in range(-x, center + 1):
-                        ans1[x, y] += kernel[center + i] * ans[x + i, y]
-                elif x > (height - 1 - center):
-                    for i in range(-center, height - x):
-                        ans1[x, y] += kernel[center + i] * ans[x + i, y]
-                else:
-                    for i in range(-center, center + 1):
-                        ans1[x, y] += kernel[center + i] * ans[x + i, y]
-                    ans1[x, y] /= weight
+            for x in range(center, height - center):
+                ans1[x, y] = 0
+                for i in range(kernelsize):
+                    ans1[x, y] += kernel[i] * ans[x- center + i, y]
+                ans1[x, y] /= weight   
     return ans1
 
 
@@ -262,25 +258,25 @@ def Gsmooth2D(I, sigma = 0.8, kernelsize = 3.0):        # Gaussian Smooth 2D ver
     return ans
 
 
-
-
-
-def Gkernel(sigma = 0.8, kernelsize = 5):        # generate Gaussian weight kernel 
-    kernel = np.zeros([kernelsize,kernelsize])       # create a 2D kernel for the Gsmooth
-    center = int(kernelsize/2)
-    PI = 3.1415926
-    for i in range(center + 1): #build the kernel
-        for j in range(center + 1):
-            dist = ((center - i)**2 + (center - j)**2)   # the distance to the center of the kernel
-            kernel[i, j] = kernel[kernelsize - 1 - i, kernelsize - 1 - j] = \
-            kernel[i, kernelsize - 1 - j] =\
-            kernel[kernelsize - 1 - i, j] =\
-            np.exp( - dist / (2 * sigma * sigma)) / (2 * PI * sigma * sigma)
-#     weight = 0.0
-#     for i in range(kernelsize):
-#         for j in range(kernelsize):
-#             weight += kernel[i,j]
-    return kernel
+#
+#
+#
+#def Gkernel(sigma = 0.8, kernelsize = 5):        # generate Gaussian weight kernel 
+#    kernel = np.zeros([kernelsize,kernelsize])       # create a 2D kernel for the Gsmooth
+#    center = int(kernelsize/2)
+#    PI = 3.1415926
+#    for i in range(center + 1): #build the kernel
+#        for j in range(center + 1):
+#            dist = ((center - i)**2 + (center - j)**2)   # the distance to the center of the kernel
+#            kernel[i, j] = kernel[kernelsize - 1 - i, kernelsize - 1 - j] = \
+#            kernel[i, kernelsize - 1 - j] =\
+#            kernel[kernelsize - 1 - i, j] =\
+#            np.exp( - dist / (2 * sigma * sigma)) / (2 * PI * sigma * sigma)
+##     weight = 0.0
+##     for i in range(kernelsize):
+##         for j in range(kernelsize):
+##             weight += kernel[i,j]
+#    return kernel
 
 
 def GenerateCovarianceEig(CM, GX, GY, masksize = 5): #CM.shape :[height,width,2,2] Generate the Coverence Matrix and Eigen value
@@ -801,15 +797,15 @@ def GenerateGaussianLayers(I, Gnum):# I is the input image, Lnum is the number o
     sigma = np.zeros(Gnum)#the sigma values for different guassian
     s = Gnum - 2
 #     k = np.sqrt(2)
-    k = np.power(2, (1.0/s)) 
+    k = np.power(2, (1.0/s))
     sigmazero = 1.6
     for i in range(Gnum - 1):
         sigma[i] = sigmazero * np.power(k,i)
     ans[0] = I
     for i in range(Gnum - 1):
         ans[i + 1] = Gsmooth(I, sigma[i], 7, 1)
-        ans[i + 1] = ans[i + 1][4:-4, 4:-4]
-     ans[0] = ans[0][4:-4, 4:-4]
+#        ans[i + 1] = ans[i + 1][4:-4, 4:-4]
+#    ans[0] = ans[0][4:-4, 4:-4]
     return ans
         
     
@@ -918,7 +914,8 @@ def DiffofGaussian(GP, Snum, Gnum): # GP is the GaussianPyramid
     for i in range(Snum):
         for j in range(DGnum):
             print "DiffofGaussian processing " + str(i) + " " + str(j)
-            DoG[(i,j)] = Diff(GP[(i, j)], GP[(i, j + 1)])
+#            DoG[(i,j)] = Diff(GP[(i, j)], GP[(i, j + 1)])
+            DoG[(i,j)] = GP[(i, j)] - GP[(i, j + 1)]
     return DoG
 
 def DoGPyramidDisplay(DoG, Snum, Gnum): #shift the value in a DoG Pyramid for display
@@ -926,8 +923,10 @@ def DoGPyramidDisplay(DoG, Snum, Gnum): #shift the value in a DoG Pyramid for di
     for i in range(Snum):
         (height, width) = DoG[i, 0].shape
         for j in range(Gnum - 1):
-            ScaleMapping(DoGDis[i, j], 0.0, 255.0)
+#            ScaleMapping(DoGDis[i, j], 0.0, 1.0)
+            DoGDis[i, j] = DoG[i, j] + 0.2
     return DoGDis
+    
 def ExtractDoGExtrema(DoG, Snum, DoGnum): # compare each pixel value of DoG with the 26 neigboring pixels
     ans = c.copy(DoG)
     v = np.zeros(27)
@@ -940,8 +939,8 @@ def ExtractDoGExtrema(DoG, Snum, DoGnum): # compare each pixel value of DoG with
                 print "Extracting Extrema...", percent, "% complete"
             (height, width) = ans[i, j].shape
             ans[i, j] = np.zeros(ans[i, j].shape)
-            for x in range(1, height - 1):
-                for y in range(1, width - 1):
+            for x in range(10, height - 10):
+                for y in range(10, width - 10):
                     v[0] = DoG[i, j][x, y]
                     v[1] = DoG[i, j][x - 1, y - 1]
                     v[2] = DoG[i, j][x - 1, y]
@@ -973,18 +972,19 @@ def ExtractDoGExtrema(DoG, Snum, DoGnum): # compare each pixel value of DoG with
                     maxcheck = 0
                     mincheck = 0
                     equalcheck = 0
-                    for k in range (1, 27):
-                        if v[k] == v[0]:
-                            equalcheck += 1
-                            break
-                        if v[k] > v[0]:
-                            mincheck += 1
-                        if v[k] < v[0]:
-                            maxcheck += 1
-#                         check = np.argsort(v, axis = 0)
-                    #if (equalcheck == 0) and ((maxcheck == 0 and mincheck > 0) or (maxcheck > 0 and mincheck == 0)):
-                    if maxcheck == 26 or mincheck == 26:
-                        ans[i, j][x, y] = 1     
+                    if abs(v[0]) >= 0.001:# this is a threshold to be determined by the input image
+                        for k in range (1, 27):
+                            if v[k] == v[0]:
+                                equalcheck += 1
+                                break
+                            if v[k] > v[0]:
+                                mincheck += 1
+                            if v[k] < v[0]:
+                                maxcheck += 1
+                            if maxcheck > 0 and mincheck > 0:
+                                break
+                        if maxcheck == 26 or mincheck == 26:
+                            ans[i, j][x, y] = 1     
     ans1 = {(0,0):0}
     for i in range(Snum):
         for j in range(1, DoGnum - 1):
