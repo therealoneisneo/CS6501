@@ -8,9 +8,10 @@ import sys
 import tools as t
 
 #----------------------------------------------------------initialize
-inputname = t.filepath("siftdata/building.jpg")
-
-
+#inputname = t.filepath("siftdata/ironman.jpg")
+inputname = t.filepath("siftdata/lena.png")
+#inputname = t.filepath("siftdata/building.jpg")
+#inputname = t.filepath("siftdata/sculpture.jpg")
 
 #only take grayscale image
 Snum = 4 # number of different scales:4
@@ -24,12 +25,18 @@ GaussianPyramid = {(0,0):0} #initialize a dictionary
 
 
 I = skimage.img_as_float(skimage.io.imread(inputname))
-IG = skimage.img_as_float(skimage.io.imread(inputname)) # when I is a gray scale image, the reading file is a 2d array
+#IG = skimage.img_as_float(skimage.io.imread(inputname)) # when I is a gray scale image, the reading file is a 2d array
 #IG = t.GrayToArray(I)
+IG = t.TurnGray(I)
 
-#
-#    
+#skimage.io.imsave("siftdata/Gbuilding.jpg", IG)
+
+#------------------------------------------------------------Gaussian pyramid
+
+
+    
 #temp = t.GenerateGaussianLayers(t.ScaleImage2(IG, 2), Gnum)
+#
 #
 #for j in range(Gnum):
 #    GaussianPyramid[(0,j)] = temp[j]
@@ -40,7 +47,7 @@ IG = skimage.img_as_float(skimage.io.imread(inputname)) # when I is a gray scale
 #        GaussianPyramid[(i,j)] = temp[j]
 # 
 #t.SavePyramid(inputname, GaussianPyramid, "G", Snum, Gnum)
-#
+
 
 
 #----------------------------------------------------------DoG
@@ -49,36 +56,45 @@ GaussianPyramid = t.ReadInPyramid(inputname, "G", Snum, Gnum)
  
 DoGPyramid = t.DiffofGaussian(GaussianPyramid, Snum, Gnum)
 
-#DoGDis = t.DoGPyramidDisplay(DoGPyramid, Snum, Gnum)
-#
-#t.SavePyramid(inputname, DoGDis, "DoG", Snum, Gnum - 1)
+DoGDis = t.DoGPyramidDisplay(DoGPyramid, Snum, Gnum)
+
+t.SavePyramid(inputname, DoGDis, "DoG", Snum, Gnum - 1)
   
-  
-# #----------------------------------------------------------Extrema 
+
+#----------------------------------------------------------Extrema 
  
 Extrema = t.ExtractDoGExtrema(DoGPyramid, Snum, DoGnum)
-  
+
 t.SavePyramid(inputname, Extrema, "ExRaw", Snum, DoGnum - 2)
+
+Extrema = t.ReadInPyramid(inputname, "ExRaw", Snum, DoGnum - 2)
+
+ExStack = t.ExtremaLocations(Extrema, Snum, Gnum - 3)
+
+MarkedImage = t.DisplayKeyPoints(ExStack, GaussianPyramid, I)
+
+skimage.io.imsave("RawResult.jpg", MarkedImage)
  
-t.RefineExtrima(Extrema, DoGPyramid, Snum, Gnum, 12, 9, 0.02)
+FineExtremas = t.RefineExtrema(IG, ExStack, DoGPyramid, Snum, Gnum, 10, 9, 0.018)
  
-t.SavePyramid(inputname, Extrema, "ExFine", Snum, DoGnum - 2)
+#t.SavePyramid(inputname, FineExtremas, "ExFine", Snum, DoGnum - 2)
 
 
 # #----------------------------------------------------------read in data
 
-
-#print 1
-#
-#FineExtrema = t.ReadInPyramid(inputname, "ExFine", Snum, Gnum - 3)
-#
-#print 2
+#FineExtrema = t.ReadInPyramid(inputname, "ExFine", Snum, DoGnum - 2)
 #
 #ExStack = t.ExtremaLocations(FineExtrema, Snum, Gnum - 3) # a stack of extrema info: scale, layer, x, y.
-##t.SaveExStack(ExStack)
+t.SaveExStack(FineExtremas, "ExStack.txt")
+
+ExStack = t.ReadExStack("ExStack.txt")
+
+MarkedImage = t.DisplayKeyPoints(ExStack, GaussianPyramid, I)
+
 #
-#print 3
+skimage.io.imsave("result.jpg", MarkedImage)
 #
+#skimage.io.imshow(MarkedImage)
 #result = t.GenerateDescriptors(ExStack, GaussianPyramid)
 #
 #print 4

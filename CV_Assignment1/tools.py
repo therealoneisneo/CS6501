@@ -4,92 +4,8 @@ import sys
 import skimage.io
 import skimage.transform
 
-#First version of Gsmooth
-# def Gsmooth(I, sigma = 0.8, kernelsize = 3.0):        # Gaussian Smooth
-#     # I is the input image, sigma is the parameter for the Gsmooth, kernelsize is the size of the convolution mask
-#     kernel = np.zeros(kernelsize)       # create a 1D kernel for the Gsmooth
-#     center = int(kernelsize/2)
-#     PI = 3.1415926
-#     for i in range(center + 1): #build the kernel
-#         dist = abs(center - i)# the distance to the center of the kernel
-#         kernel[i] = kernel[kernelsize - 1 - i] = np.exp( - dist / (2 * sigma * sigma)) / (np.sqrt(2 * PI) * sigma)
-#         
-#     compute_weight = False
-#     weight = 0.0
-#     for i in range(len(kernel)):
-#         weight += kernel[i]
-#         
-#     ans = np.empty(I.shape)
-#     ans1 = np.empty(I.shape)
-#     (height, width, channels) = I.shape
-#     sums = width + height
-#     # first round, smooth in x direction
-#     for x in range(height):
-#         print " Smoothing...", (x * 100) / sums, "% complete"
-#         for y in range(width):
-#             for c in range(channels):
-#                 if y < center:
-#                     weight = 0.0
-#                     diff = center - y
-#                     for i in range(diff,kernelsize):
-#                         weight += kernel[i]
-#                     compute_weight = True
-#                     for i in range(-center + diff, center + 1):
-#                         ans[x,y,c] += kernel[center + i] * I[x, y + i, c]
-#                     ans[x,y,c] /= weight
-#                 elif y > (width - 1 - center):
-#                     weight = 0.0
-#                     diff = y - (width - 1 - center)
-#                     for i in range(kernelsize - diff):
-#                         weight += kernel[i]
-#                     compute_weight = True
-#                     for i in range(-center, center + 1 - diff):
-#                         ans[x,y,c] += kernel[center + i] * I[x, y + i, c]
-#                     ans[x,y,c] /= weight
-#                 else:
-#                     if compute_weight:
-#                         weight = 0.0
-#                         for i in range(len(kernel)):
-#                             weight += kernel[i]
-#                         compute_weight = False
-#                     for i in range(-center, center + 1):
-#                         ans[x,y,c] += kernel[center + i] * I[x, y + i, c]
-#                     ans[x,y,c] /= weight
-#     # second round, smooth in y direction
-#     for y in range(width):
-#         print " Smoothing...", ((y + height) * 100) / sums, "% complete"
-#         for x in range(height):
-#             for c in range(channels):
-#                 if x < center:
-#                     weight = 0.0
-#                     diff = center - x
-#                     for i in range(diff,kernelsize):
-#                         weight += kernel[i]
-#                     compute_weight = True
-#                     for i in range(-center + diff, center + 1):
-#                         ans1[x,y,c] += kernel[center + i] * ans[x + i, y, c]
-#                     ans1[x,y,c] /= weight
-#                 elif x > (width - 1 - center):
-#                     weight = 0.0
-#                     diff = x - (width - 1 - center)
-#                     for i in range(kernelsize - diff):
-#                         weight += kernel[i]
-#                         compute_weight = True
-#                     for i in range(-center, center + 1 - diff):
-#                         ans1[x,y,c] += kernel[center + i] * ans[x + i, y, c]
-#                     ans1[x,y,c] /= weight
-#                 else:
-#                     if compute_weight:
-#                         weight = 0.0
-#                         for i in range(len(kernel)):
-#                             weight += kernel[i]
-#                         compute_weight = False
-#                     for i in range(-center, center + 1):
-#                         ans1[x,y,c] += kernel[center + i] * ans[x + i, y, c]
-#                     ans1[x,y,c] /= weight
-#     return ans1
 
-
+DoGThreshold = 0.015
 
 
 def BuildGKernel(sigma, kernelsize, Dimension): # build Gaussian kernel, Dimension take in 1 or 2 only
@@ -258,27 +174,6 @@ def Gsmooth2D(I, sigma = 0.8, kernelsize = 3.0):        # Gaussian Smooth 2D ver
     return ans
 
 
-#
-#
-#
-#def Gkernel(sigma = 0.8, kernelsize = 5):        # generate Gaussian weight kernel 
-#    kernel = np.zeros([kernelsize,kernelsize])       # create a 2D kernel for the Gsmooth
-#    center = int(kernelsize/2)
-#    PI = 3.1415926
-#    for i in range(center + 1): #build the kernel
-#        for j in range(center + 1):
-#            dist = ((center - i)**2 + (center - j)**2)   # the distance to the center of the kernel
-#            kernel[i, j] = kernel[kernelsize - 1 - i, kernelsize - 1 - j] = \
-#            kernel[i, kernelsize - 1 - j] =\
-#            kernel[kernelsize - 1 - i, j] =\
-#            np.exp( - dist / (2 * sigma * sigma)) / (2 * PI * sigma * sigma)
-##     weight = 0.0
-##     for i in range(kernelsize):
-##         for j in range(kernelsize):
-##             weight += kernel[i,j]
-#    return kernel
-
-
 def GenerateCovarianceEig(CM, GX, GY, masksize = 5): #CM.shape :[height,width,2,2] Generate the Coverence Matrix and Eigen value
     height = CM.shape[0]
     width = CM.shape[1]
@@ -415,6 +310,38 @@ def TurnGray(I): # turn the image to gray scale
     return ans
 
 
+
+def ComputeXorYGradient_Pixel(I, x, y, Gtype): # Compute the Gradient of a pixel in a image. Gtype can be: 0: GX 1: GY 2: GXX 3:GYY 4:GXY 5:All
+    tempI = np.zeros([5, 5])
+    for i in range(5):
+        for j in range(5):
+            tempI[i, j] = I[x - 2 + i, y - 2 + j]
+    Gx = ComputeXorYGradient(tempI, 0)
+    Gy = ComputeXorYGradient(tempI, 1)
+    tempGx = np.zeros([3, 3])
+    tempGy = np.zeros([3, 3])
+    for i in range(3):
+        for j in range(3):
+            tempGx[i, j] = Gx[1 + i, 1 + j]
+            tempGy[i, j] = Gy[1 + i, 1 + j]
+    Gxx = ComputeXorYGradient(tempGx, 0)
+    Gyy = ComputeXorYGradient(tempGy, 1)
+    Gxy = ComputeXorYGradient(tempGx, 1)
+    if Gtype == 0:
+        return tempGx[1, 1]
+    elif Gtype == 1:
+        return tempGx[1, 1]
+    elif Gtype == 2:
+        return Gxx[1, 1]
+    elif Gtype == 3:
+        return Gyy[1, 1]
+    elif Gtype == 4:
+        return Gxy[1, 1]
+    else:
+        return (tempGx[1, 1], tempGy[1, 1], Gxx[1, 1], Gyy[1, 1], Gxy[1, 1])
+
+
+
 def ComputeXorYGradient(I, Gtype): # I is the input, Gtype: 0: x direction, 1: y direction
     
     height = I.shape[0]
@@ -438,7 +365,7 @@ def ComputeXorYGradient(I, Gtype): # I is the input, Gtype: 0: x direction, 1: y
         if len(I.shape) > 2:    
             k = 0
             for i in range(1, height - 1):
-                print"Computing X Gradient...",  (i * 100) / (height - 1), "% complete..."
+#                print"Computing X Gradient...",  (i * 100) / (height - 1), "% complete..."
                 for j in range(1, width - 1):
                     ans[i,j] = I[i - 1, j - 1, k] * SobelX[0,0] + \
                            I[i - 1, j, k] * SobelX[0,1] + \
@@ -451,7 +378,7 @@ def ComputeXorYGradient(I, Gtype): # I is the input, Gtype: 0: x direction, 1: y
                            I[i + 1, j + 1, k] * SobelX[2,2]
         else:
             for i in range(1, height - 1):
-                print"Computing X Gradient...",  (i * 100) / (height - 1), "% complete..."
+#                print"Computing X Gradient...",  (i * 100) / (height - 1), "% complete..."
                 for j in range(1, width - 1):
                     ans[i,j] = I[i - 1, j - 1] * SobelX[0,0] + \
                            I[i - 1, j] * SobelX[0,1] + \
@@ -467,7 +394,7 @@ def ComputeXorYGradient(I, Gtype): # I is the input, Gtype: 0: x direction, 1: y
         if len(I.shape) > 2:    
             k = 0
             for i in range(1, height - 1):
-                print"Computing Y Gradient...",  (i * 100) / (height - 1), "% complete..."
+#                print"Computing Y Gradient...",  (i * 100) / (height - 1), "% complete..."
                 for j in range(1, width - 1):
                     ans[i,j] = I[i - 1, j - 1, k] * SobelY[0,0] + \
                            I[i - 1, j, k] * SobelY[0,1] + \
@@ -480,7 +407,7 @@ def ComputeXorYGradient(I, Gtype): # I is the input, Gtype: 0: x direction, 1: y
                            I[i + 1, j + 1, k] * SobelY[2,2]
         else:
             for i in range(1, height - 1):
-                print"Computing Y Gradient...",  (i * 100) / (height - 1), "% complete..."
+#                print"Computing Y Gradient...",  (i * 100) / (height - 1), "% complete..."
                 for j in range(1, width - 1):
                     ans[i,j] = I[i - 1, j - 1] * SobelY[0,0] + \
                            I[i - 1, j] * SobelY[0,1] + \
@@ -513,29 +440,6 @@ def ComputeGradient(I, GX, GY): #compute the gradient of x and y and stored in G
     # convolution
     GX = ComputeXorYGradient(I, 0)
     GY = ComputeXorYGradient(I, 1)
-#    k = 0
-#    for i in range(1, height - 1):
-#        print"Computing Gradient...",  (i * 100) / (height - 1), "% complete..."
-#        for j in range(1, width - 1):
-#            GX[i,j] = I[i - 1, j - 1, k] * SobelX[0,0] + \
-#                   I[i - 1, j, k] * SobelX[0,1] + \
-#                   I[i - 1, j + 1, k] * SobelX[0,2] + \
-#                   I[i, j - 1, k] * SobelX[1,0] + \
-#                   I[i, j, k] * SobelX[1,1] + \
-#                   I[i, j + 1, k] * SobelX[1,2] + \
-#                   I[i + 1, j - 1, k] * SobelX[2,0] + \
-#                   I[i + 1, j, k] * SobelX[2,1] + \
-#                   I[i + 1, j + 1, k] * SobelX[2,2]
-#                   
-#            GY[i,j] = I[i - 1, j - 1, k] * SobelY[0,0] + \
-#                   I[i - 1, j, k] * SobelY[0,1] + \
-#                   I[i - 1, j + 1, k] * SobelY[0,2] + \
-#                   I[i, j - 1, k] * SobelY[1,0] + \
-#                   I[i, j, k] * SobelY[1,1] + \
-#                   I[i, j + 1, k] * SobelY[1,2] + \
-#                   I[i + 1, j - 1, k] * SobelY[2,0] + \
-#                   I[i + 1, j, k] * SobelY[2,1] + \
-#                   I[i + 1, j + 1, k] * SobelY[2,2]
     return 
 
 
@@ -918,6 +822,7 @@ def DiffofGaussian(GP, Snum, Gnum): # GP is the GaussianPyramid
             DoG[(i,j)] = GP[(i, j)] - GP[(i, j + 1)]
     return DoG
 
+
 def DoGPyramidDisplay(DoG, Snum, Gnum): #shift the value in a DoG Pyramid for display
     DoGDis = c.copy(DoG)
     for i in range(Snum):
@@ -926,6 +831,8 @@ def DoGPyramidDisplay(DoG, Snum, Gnum): #shift the value in a DoG Pyramid for di
 #            ScaleMapping(DoGDis[i, j], 0.0, 1.0)
             DoGDis[i, j] = DoG[i, j] + 0.2
     return DoGDis
+
+
     
 def ExtractDoGExtrema(DoG, Snum, DoGnum): # compare each pixel value of DoG with the 26 neigboring pixels
     ans = c.copy(DoG)
@@ -972,7 +879,7 @@ def ExtractDoGExtrema(DoG, Snum, DoGnum): # compare each pixel value of DoG with
                     maxcheck = 0
                     mincheck = 0
                     equalcheck = 0
-                    if abs(v[0]) >= 0.001:# this is a threshold to be determined by the input image
+                    if abs(v[0]) >= DoGThreshold:# this is a threshold to be determined by the input image
                         for k in range (1, 27):
                             if v[k] == v[0]:
                                 equalcheck += 1
@@ -994,7 +901,7 @@ def ExtractDoGExtrema(DoG, Snum, DoGnum): # compare each pixel value of DoG with
 
 
 
-def filepath(rawpath):
+def filepath(rawpath):# adapt the file path to the system
     parsing = rawpath.split('/')
     n = len(parsing)
     ans = ""
@@ -1006,12 +913,6 @@ def filepath(rawpath):
             ans += "\\"            
         ans += parsing[n - 1]
     return ans
-
-
-
-
-
-
 
 
 
@@ -1051,83 +952,6 @@ def Marker(I, x, y, size = 4):# Mark the position (x,y) in I with a (2*size + 1)
                 I[x - i, y - size, k] = 1
     return
     
-    
-    
-# Assigement 2 update---------------------------------------
-
-# 
-# def CropFace(Image, location, ratio = 1.0): #Crop the face at the location with a control ratio. location is a floatarray with length 12
-#     frame = np.zeros(4)# x-max, y-max, x-min, y-min
-#     frame[0] = 0.0
-#     frame[1] = 0.0
-#     frame[2] = 10000.0
-#     frame[3] = 10000.0
-#     for i in range(6):
-#         if (location[2 * i + 1] > frame[0]): # x-cord
-#             frame[0] = location[2 * i + 1]
-#         if (location[2 * i + 1] < frame[2]): # x-cord
-#             frame[2] = location[2 * i + 1]
-#         if (location[2 * i] > frame[1]): # y-cord
-#             frame[1] = location[2 * i]
-#         if (location[2 * i] < frame[3]): # y-cord
-#             frame[3] = location[2 * i]
-#     center = [0,0]
-#     halfframe = [0,0]
-#     halfframeX = (frame[0] - frame[2]) / 2.0
-#     halfframeY = (frame[1] - frame[3]) / 2.0
-#     center[0] = int(frame[2] + halfframeX)
-#     center[1] = int(frame[3] + halfframeY)
-#     halfframe = int(ratio * max(halfframeX, halfframeY))
-#     frame[0] = min(center[0] + halfframe, Image.shape[0])
-#     frame[1] = min(center[1] + halfframe, Image.shape[1])
-#     frame[2] = max(center[0] - halfframe, 0)
-#     frame[3] = max(center[1] - halfframe, 0)
-#     face = ResizeFace(CropImage(Image, frame), 12)
-#     face = ScaleMapping(face)
-# #     face = Image.copy()
-# #     Marker(face, center[0], center[1], 15)
-#     return face
-# 
-# 
-# def CropImage(Image, frame): #corp an image
-#     CropI = Image[frame[2]:frame[0], frame[3]:frame[1]] 
-#     return CropI
-# 
-#  
-# def ResizeFace(Image, size):# this function resize a square image
-#     Rimage = np.zeros([size, size, 4])
-#     (height, width, channels) = Image.shape
-#     if (size > Image.shape[0]): # enlarge
-#         for i in range(size):
-#             ratioX = float(i) / float(size)
-#             currentX = np.floor(ratioX * height)
-#             for j in range(size):
-#                 ratioY = float(j) / float(size)
-#                 currentY = np.floor(ratioY * width)
-#                 for k in range(3):
-#                     Rimage[i, j, k] = Image[currentX, currentY, 0]
-#                 Rimage[i, j, 3] = 1
-#         return Rimage
-#     elif (size < Image.shape[0]): #shrink
-#         shrinkratio = int(np.ceil(float(height) / float(size)))
-#         cells = shrinkratio * shrinkratio
-#         for i in range(size):
-#             ratioX = float(i) / float(size)
-#             currentX = np.floor(ratioX * height)
-#             for j in range(size):
-#                 ratioY = float(j) / float(size)
-#                 currentY = np.floor(ratioY * width)
-#                 temp = 0
-#                 for m in range(shrinkratio):
-#                     for n in range(shrinkratio):
-#                         temp += Image[currentX + m, currentY + n, 0]
-#                 temp /= cells
-#                 for k in range(3):
-#                     Rimage[i, j, k] = temp
-#                 Rimage[i, j, 3] = 1
-#         return Rimage
-#     else:
-#         return Image
 
 def ValueScale(M, lower, upper):
     if len(M.shape) <= 2:
@@ -1203,63 +1027,177 @@ def SavePyramid(ImageName, Pyramid, Itype, Snum, Gnum):
             print "Saving " + temppath
             skimage.io.imsave(temppath, Matrix_to_img(Pyramid[(i,j)]))
     return
+
+
+def KeypointsFilter(IG, Extremas, DoG, rim = 10, ratio = 10, threshold = 0.02): #Extremas is the stack of info of all extrema points.
+    for k in range(len(Extremas)):
+        extrema = Extremas[k]
+        if extrema[0] != -1:
+             scale = extrema[0]
+             layer = extrema[1] + 1 # correspond to DoG layer
+             c = extrema[2]
+             l = extrema[3]
+             Base = DoG[scale, layer]    
+             (height, width) = Base.shape
+             if (c < rim) or (c > (height - rim)) or (l < rim) or (l > (width - rim)):
+                 extrema[0] = -1
+                 break
+             
+             x = int(float(c) / height * IG.shape[0])
+             y = int(float(l) / width * IG.shape[1])
+             gradient = ComputeXorYGradient_Pixel(IG, x, y, 5)
+             Dxx = gradient[2]
+             Dyy = gradient[3]
+             Dxy = gradient[4]
+             Tr = Dxx + Dyy
+             Det = Dxx * Dyy - Dxy * Dxy
+             if Det == 0:
+                 ratioValue = 1000
+             else:
+                 ratioValue = (Tr) * (Tr) / Det
+             if (np.abs(DoG[scale, layer][c, l]) < threshold) or (ratioValue > ratio):
+                 extrema[0] = -1
+    return       
             
-            
-def KeypointsFilter(Extrima, DoG, rim = 10, ratio = 10, threshold = 0.02): #Extrimas is a layer of extrimas points graph. DoG is its corresponding DoG layer
-    (height, width) = Extrima.shape
-    Gradient = {0:0}
-    for i in range(5):
-        Gradient[i] = c.copy(DoG)
-    #Gradient: 0: x, 1: y, 2:xx, 3:yy, 4:xy
-    Gradient[0] = ComputeXorYGradient(DoG, 0)
-    Gradient[1] = ComputeXorYGradient(DoG, 1)
-    Gradient[2] = ComputeXorYGradient(Gradient[0], 0)
-    Gradient[3] = ComputeXorYGradient(Gradient[1], 1)
-    Gradient[4] = ComputeXorYGradient(Gradient[0], 1)
-    for i in range(height):
-        for j in range(width):
-            
-            if (i < rim) or (i > (height - rim)) or (j < rim) or (j > (width - rim)):
-                Extrima[i, j] = 0
-            
-            elif Extrima[i, j] > 0:
-                Dxx = Gradient[2][i, j]
-                Dyy = Gradient[3][i, j]
-                Dxy = Gradient[4][i, j]
-                Tr = Dxx + Dyy
-                Det = Dxx * Dyy - Dxy * Dxy
-                ratioValue = (Tr) * (Tr) / Det
-                if (np.abs(DoG[i, j]) < threshold) or (ratioValue > ratio):
-                    Extrima[i, j] = 0
-    return
+#def KeypointsFilter(IG, Extrema, DoG, rim = 10, ratio = 10, threshold = 0.02): #Extremas is the info of a single extrema point. 
+#    (height, width) = Extrema.shape
+##    Gradient = {0:0}
+##    for i in range(5):
+##        Gradient[i] = c.copy(DoG)
+#    #Gradient: 0: x, 1: y, 2:xx, 3:yy, 4:xy
+##    Gradient[0] = ComputeXorYGradient(DoG, 0)
+##    Gradient[1] = ComputeXorYGradient(DoG, 1)
+##    Gradient[2] = ComputeXorYGradient(Gradient[0], 0)
+##    Gradient[3] = ComputeXorYGradient(Gradient[1], 1)
+##    Gradient[4] = ComputeXorYGradient(Gradient[0], 1)
+#    for i in range(height):
+#        for j in range(width):
+#            if (i < rim) or (i > (height - rim)) or (j < rim) or (j > (width - rim)):
+#                Extrema[i, j] = 0
+#            
+#            elif Extrema[i, j] > 0:
+##                Dxx = Gradient[2][i, j]
+##                Dyy = Gradient[3][i, j]
+##                Dxy = Gradient[4][i, j]
+#                x = int(float(i) / height * IG.shape[0])
+#                y = int(float(j) / width * IG.shape[1])
+#                gradient = ComputeXorYGradient_Pixel(IG, x, y, 5)
+#                Dxx = gradient[2]
+#                Dyy = gradient[3]
+#                Dxy = gradient[4]
+#                Tr = Dxx + Dyy
+#                Det = Dxx * Dyy - Dxy * Dxy
+#                if Det == 0:
+#                    ratioValue = 1000
+#                else:
+#                    ratioValue = (Tr) * (Tr) / Det
+#                if (np.abs(DoG[i, j]) < threshold) or (ratioValue > ratio):
+#                    Extrema[i, j] = 0
+#    return
        
        
        
        
-def RefineExtrima(Extremas, DoG, Snum, Gnum, rim = 10, ratio = 10, threshold = 0.02):
+#def RefineExtrema(IG, Extremas, DoG, Snum, Gnum, rim = 10, ratio = 10, threshold = 0.02):
+#    extremas = c.copy(Extremas)
+#    percent = 0.0
+#    sums = Snum * (Gnum - 2)
+#    for i in range(Snum):
+#        for j in range(1, Gnum - 2):
+#            if ((i * (j - 1) * 100) / sums) != percent:
+#                percent = ((i * (j - 1) * 100) / sums)
+#                print "Refining Extrema...", percent, "% complete"
+#            KeypointsFilter(IG, extremas[i, j - 1], DoG[i, j], rim, ratio, threshold)
+#    return extremas
+
+def RefineExtrema(IG, Extremas, DoG, Snum, Gnum, rim = 10, ratio = 10, threshold = 0.02): # to re-adjust the location of keypoints to subpixel, Extremas is a stack of extrema points info
     extremas = c.copy(Extremas)
-    percent = 0.0
-    sums = Snum * (Gnum - 2)
-    for i in range(Snum):
-        for j in range(1, Gnum - 2):
-            if ((i * (j - 1) * 100) / sums) != percent:
-                percent = ((i * (j - 1) * 100) / sums)
-                print "Refining Extrema...", percent, "% complete"
-            KeypointsFilter(extremas[i, j - 1], DoG[i, j], rim, ratio, threshold)
+    AdjustKeypoints(extremas, DoG)
+    KeypointsFilter(IG, extremas, DoG, rim, ratio, threshold)
+    temp = {0:0}
+    count = 0
+    for i in range(len(extremas)):
+        if extremas[i][0] >= 0:
+            temp[count] = c.copy(extremas[i])
+            count += 1
+    extremas = temp
+            
     return extremas
 
 
+
+def AdjustKeypoints(Extremas, DoG): # adjust a "Extremas" points location, or discard it
+    image_scale = 1.0 / 255
+    deriv_scale = 0.5 * image_scale
+    deriv_2_scale = image_scale
+    cross_scale = 0.25 * image_scale
+    for j in range(len(Extremas)):
+        extrema = Extremas[j]
+        count = 0    
+        for i in range(5):
+            scale = int(extrema[0])
+            layer = int(extrema[1]) + 1 # correspond to DoG layer
+            if layer == 4:
+                a = 0
+            c = extrema[2]
+            l = extrema[3]
+            Base = DoG[scale, layer]
+            Prev = DoG[scale, layer - 1]
+            Next = DoG[scale, layer + 1] 
+            dx = (Base[c, l + 1] - Base[c, l - 1]) * deriv_scale
+            dy = (Base[c + 1, l] - Base[c - 1, l]) * deriv_scale
+            ds = (Next[c, l] - Prev[c, l]) * deriv_scale
+            d1 = [dx, dy, ds]
+            
+            center = Base[c, l] * 2
+            dxx = (Base[c, l + 1] + Base[c, l - 1] - center) * deriv_2_scale
+            dyy = (Base[c + 1, l] + Base[c - 1, l] - center) * deriv_2_scale
+            dss = (Next[c, l] + Prev[c, l] - center) * deriv_2_scale
+            dxy = (Base[c + 1, l + 1] - Base[c + 1, l - 1] - Base[c - 1, l + 1] + Base[c - 1, l - 1]) * cross_scale
+            dxs = (Next[c, l + 1] - Next[c, l - 1] - Prev[c, l + 1] + Prev[c, l - 1]) * cross_scale
+            dys = (Next[c + 1, l] - Next[c - 1, l] - Prev[c + 1, l] + Prev[c - 1, l]) * cross_scale
+    
+            Hessian = [[dxx, dxy, dxs],[dxy, dyy, dys],[dxs, dys, dss]]
+            result = np.linalg.solve(Hessian, d1) * -1
+            if np.abs(result[0]) < 0.5 or np.abs(result[1]) < 0.5 or np.abs(result[2]) < 0.5:
+                break
+            extrema[2] += np.ceil(result[0])
+            extrema[3] += np.ceil(result[1])
+            extrema[1] += np.ceil(result[2])
+            (height, width) = Base.shape
+            if (extrema[1] < 1 or extrema[1] >= 3) or (extrema[2] < 0 or extrema[2] > height) or (extrema[3] < 0 or extrema[3] > width):
+                extrema[0] = -1    # marked as in valid
+                break
+            count += 1
+        if count == 5:
+            extrema[0] = -1    # marked as in valid       
+    return
  
- 
-def SaveExStack(ExStack):
-    f = open("ExStack.txt", 'w')
+def SaveExStack(ExStack, filename):
+    f = open(filename, 'w')
     n = len(ExStack)
     for i in range(n):
-        f.write(ExStack[i])
+        for j in range(4):
+            f.write(str(int(ExStack[i][j])))
+            f.write(" ")
         f.write("\n")
     f.close()
     return
-   
+    
+    
+def ReadExStack(filename):
+    ExStack = {0:0}
+    f = open(filename, 'r')
+    count = 0
+    for line in f:
+        line.strip('\n')
+        templine = line.split(" ")
+        temp = [int(templine[0]),int(templine[1]),int(templine[2]),int(templine[3])]
+        ExStack[count] = temp
+        count += 1
+    f.close()
+    return ExStack
+    
 def ExtremaLocations(Extremas, Snum, Layernum): #gather up the locations in the full size image of extremas in all scales. Only for Display use. the discriptor should be generated on each scale to maintain its scale invarient features
     temp = np.zeros(4)
     ans = {0:0}
@@ -1287,15 +1225,26 @@ def ExtremaLocations(Extremas, Snum, Layernum): #gather up the locations in the 
 
 
 
-def PixelMagDir(Image, x, y):# return the magnitude and direction of a pixel's gradient
-    a = Image[x + 1, y]
-    b = Image[x - 1, y]
-    c = Image[x, y + 1]
-    d = Image[x, y - 1]
-    X = a - b
-    Y = c - d
-    mag = np.sqrt((a - b) * (a - b) + (c - d) * (c - d))
-    theta = np.arctan2(Y, X)  * 180 / np.pi
+#def PixelMagDir(Image, x, y):# return the magnitude and direction of a pixel's gradient
+#    a = Image[x + 1, y]
+#    b = Image[x - 1, y]
+#    c = Image[x, y + 1]
+#    d = Image[x, y - 1]
+#    X = a - b
+#    Y = c - d
+#    mag = np.sqrt((a - b) * (a - b) + (c - d) * (c - d))
+#    theta = np.arctan2(Y, X)  * 180 / np.pi
+#    return (mag, theta)
+    
+def PixelMagDir(Image, x, y):# return the magnitude and direction of a pixel's gradient. Based on Sobel
+    a = 2 * Image[x + 1, y] + Image[x + 1, y + 1] + Image[x + 1, y - 1]
+    b = 2 * Image[x - 1, y] + Image[x - 1, y + 1] + Image[x - 1, y - 1]
+    c = 2 * Image[x, y + 1] + Image[x + 1, y + 1] + Image[x - 1, y + 1]
+    d = 2 * Image[x, y - 1] + Image[x + 1, y - 1] + Image[x - 1, y - 1]
+    GY = a - b
+    GX = c - d
+    mag = np.sqrt(GX * GX + GY * GY)
+    theta = np.arctan2(GY, GX)  * 180 / np.pi
     return (mag, theta)
 
 
@@ -1305,6 +1254,8 @@ def SelectBin(direc, binNum):
     upper = lower + offset
     if direc < 0:
         direc = 360 + direc
+    if direc == 360:
+            direc = 0
     for i in range(binNum):
         if (direc >= lower) and (direc < upper):
             return i
@@ -1339,26 +1290,14 @@ def GetKeyDirection(Base, Extrema):
 #    positive = range(1, 5)
 #    negative = range(-4, 0).reverse()
     neigborMagDir = np.zeros([64, 5]) # cord-x and cord-y, kernel weight, Mag and Dir
-    kernel = BuildGKernel(1, 9, 2) # the sigma of the kernel still need to be determined
+    kernel = BuildGKernel(2.0, 9, 2) # the sigma of the kernel still need to be determined
     count = 0
     for i in range(8):
         for j in range(8):
             neigborMagDir[count, 0] = x + offset[i]
             neigborMagDir[count, 1] = y + offset[j]
-            neigborMagDir[count, 2] = kernel[4 + offset[i], 4 + offset[j]]
+            neigborMagDir[count, 2] = kernel[4 + offset[i], 4 + offset[j]] * 1000
             count += 1
-#            neigborMagDir[count, 0] = x + negative[i]
-#            neigborMagDir[count, 1] = y + positive[j]
-#            neigborMagDir[count, 2] = kernel[4 + negative[i], 4 + positive[j]]
-#            count += 1
-#            neigborMagDir[count, 0] = x + positive[i]
-#            neigborMagDir[count, 1] = y + negative[j]
-#            neigborMagDir[count, 2] = kernel[4 + positive[i], 4 + negative[i]]
-#            count += 1
-#            neigborMagDir[count, 0] = x + positive[i]
-#            neigborMagDir[count, 1] = y + positive[j]
-#            neigborMagDir[count, 2] = kernel[4 + positive[i], 4 + positive[j]]
-#            count += 1
     for i in range(64):
         xx = neigborMagDir[i, 0]
         yy = neigborMagDir[i, 1]
@@ -1375,15 +1314,15 @@ def GetKeyDirection(Base, Extrema):
     for i in range(binNum):
         if bins[i] > binmax:
             binmax = bins[i]
-            #binauxmaxi = binmaxi
+            binauxmaxi = binmaxi
             binmaxi = i
-#        elif bin[i] > binauxmax:
-#            binauxmaxi = i
-#    if binauxmax < binmax * 0.8:
-#        binauxmaxi = -1
+        elif bins[i] > binauxmax:
+            binauxmaxi = i
+    if binauxmax < binmax * 0.8:
+        binauxmaxi = -1
     # currently does not return the "binauxmaxi" as a secondary main direction
     
-    return (binmaxi, binNum) 
+    return (binmaxi, binNum, binmax) 
 
 
 def RotateImagebyMDir(Image, Maindir, Center): # the rotation routine during the creation of descriptor
@@ -1393,6 +1332,16 @@ def RotateImagebyMDir(Image, Maindir, Center): # the rotation routine during the
     direction = offset * (float(dirIndex) + 0.5) 
     RImage = skimage.transform.rotate(Image, direction, False, Center)
     return RImage
+
+
+def GrayImageMarker(I, x , y, color = 0): # mark a cross on a gray image, 1 is white and 0 is black
+    
+   (height, width) = I.shape
+   for i in range(height):
+       I[i, y] = color
+   for i in range(width):
+       I[x, i] = color
+   return
 
 
 def BuildDescriptor(GP, Extrema, BinNum): #build a sift descriptor for a key point "Extrema"
@@ -1407,13 +1356,17 @@ def BuildDescriptor(GP, Extrema, BinNum): #build a sift descriptor for a key poi
     
     mainDirection = GetKeyDirection(Base, Extrema)
     
-    RotatedI = RotateImagebyMDir(Base, mainDirection, (x, y))
+    RotatedI = RotateImagebyMDir(Base, mainDirection, (y, x)) # the skimage.transform rotate take in the rotation center as (y, x) rather than (x, y)
+    
+#    GrayImageMarker(RotatedI, x, y, 0)
+#   
+#    skimage.io.imsave("siftdata/rotated.jpg", RotatedI)  #debug
     
     #rotate the image by its mainDirection
     ind = range(-8, 9)
     ind.remove(0)
     neigborMagDir = np.zeros([256, 5]) # cord-x and cord-y, kernel weight, Mag and Dir
-    kernel = BuildGKernel(2.0, 17, 2) # the sigma of the kernel still need to be determined
+    kernel = BuildGKernel(3.5, 17, 2) * 1000 # the sigma of the kernel still need to be determined
     count = 0
     for i in range(16):
         for j in range(16):
@@ -1462,4 +1415,104 @@ def GenerateDescriptors(ExStack, GP): #main routine to generate 128 dimensional 
     #build a collection of descriptors here
     return descriptors
             
+def ArrowMarker(I, x1, y1, x2, y2): # mark an arrow on the image
+    k = float(y2 - y1) / float(x2 - x1)
+    height = I.shape[0]
+    width = I.shape[1]
+    if x1 < x2:
+        for x in range(x1, x2):
+            
+            y = k * (x - x1) + y1
+            if (y - np.floor(y)) < 0.5:
+                y = np.floor(y)
+            else:
+                y = np.ceil(y)
+            if x >= height or y >= width:
+                break
+            I[x, y, 0] = 1.0
+            I[x, y, 1] = 1.0
+            I[x, y, 2] = 0.0
+    else:
+        for x in range(x2, x1):
+            y = k * (x - x1) + y1
+            if (y - np.floor(y)) < 0.5:
+                y = np.floor(y)
+            else:
+                y = np.ceil(y)
+            if x >= height or y >= width:
+                break
+            I[x, y, 0] = 1.0
+            I[x, y, 1] = 1.0
+            I[x, y, 2] = 0.0
+            
+            
+    k =  float(x2 - x1) / float(y2 - y1)
+    if y1 < y2:
+        for y in range(y1, y2):
+            x = k * (y - y1) + x1
+            if (x - np.floor(x)) < 0.5:
+                x = np.floor(x)
+            else:
+                x = np.ceil(x)
+            if x >= height or y >= width:
+                break
+            I[x, y, 0] = 1.0
+            I[x, y, 1] = 1.0
+            I[x, y, 2] = 0.0
+    else:
+        for y in range(y2, y1):
+            x = k * (y - y1) + x1
+            if (x - np.floor(x)) < 0.5:
+                x = np.floor(x)
+            else:
+                x = np.ceil(x)
+            if x >= height or y >= width:
+                break
+            I[x, y, 0] = 1.0
+            I[x, y, 1] = 1.0
+            I[x, y, 2] = 0.0
+    if x2 < height and y2 < width:
+        I[x2, y2, 0] = 1.0
+        I[x2, y2, 1] = 1.0
+        I[x2, y2, 2] = 0.0
+    Marker(I, x1, y1, 2)
+    return
+
+            
+def DisplayKeyPoints(ExStackDict, GP, IM):
+    I = c.copy(IM)
+    PI = np.pi
+    (height, width, channels) = I.shape
+    for i in range(len(ExStackDict)):
+        ExStack = ExStackDict[i]
+        Scale = ExStack[0]
+        Layer = ExStack[1] + 1 # +1 for shift?
+        Base = GP[Scale, Layer]
+        (height1, width1) = Base.shape
+        x = ExStack[2]
+        y = ExStack[3]
+        temp = float(x)/height1       
+        x = temp
+        temp = float(y)/width1
+        y = temp
+        x = int(x * height)
+        y = int(y * width)
+        MDir = GetKeyDirection(Base, ExStack)
+        dirIndex = MDir[0]
+        binNum = MDir[1]
+        Magnitude = MDir[2]
+        offset = 360.0 / binNum
+        direction = offset * (float(dirIndex) + 0.5)
+        reg = direction * 2 * PI / 360
+
+        Xoffset = int(Magnitude * np.cos(reg))
+        Yoffset = int(Magnitude * np.sin(reg))   
+        if Xoffset == 0:
+            Xoffset = 1
+        if Yoffset == 0:
+            Yoffset = 1
+        ArrowMarker(I, x, y, x + Xoffset, y + Yoffset)
+    return I
+        
+        
             

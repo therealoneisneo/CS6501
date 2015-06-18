@@ -3,10 +3,10 @@ import skimage
 import skimage.io
 import tools as t
 import os
-
+import copy as c
 
 #----------------------------------------------------------initialize
-inputname = t.filepath("test/building.jpg")
+inputname = t.filepath("siftdata/building.jpg")
 
 
 
@@ -17,14 +17,31 @@ DoGnum = Gnum - 1
    
 GaussianPyramid = {(0,0):0} #initialize a dictionary
 
-#----------------------------------------------------------Gaussian pyramid
 
-a = np.zeros([3,3])
 
-b = a + 0.5
 
-print b
+a = [[5,2,3],[6,1,9],[3,5,1]]
+b = [1,2,3]
+c = np.linalg.solve(a,b)
+print c 
 
+
+
+
+
+
+
+
+
+
+
+#I = skimage.img_as_float(skimage.io.imread(inputname))
+#rotate = skimage.transform.rotate(I, 30, True)
+
+
+##print cos(2.0)
+#skimage.io.imshow(rotate)
+#skimage.io.imsave("Rbuilding.jpg", rotate)
 
 
 # IG = t.TurnGray(I)
